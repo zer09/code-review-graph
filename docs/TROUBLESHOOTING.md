@@ -6,12 +6,12 @@ Four issues account for most support questions. Check these first:
 
 ### 1. `Hooks use a matcher + hooks array` error in `.claude/settings.json`
 
-**You're on a pre-v2.2.3 release.** v2.2.1 and v2.2.2 shipped a broken hook schema — flat `{matcher, command, timeout}` entries without the required nested `hooks: []` array, timeouts in milliseconds instead of seconds, and a `PreCommit` event that isn't a real Claude Code event. PR #208 (shipped in v2.2.3) rewrote the generator to emit the correct v1.x+ schema.
+**You're on a pre-v2.2.3 release.** v2.2.1 and v2.2.2 shipped a broken hook schema - flat `{matcher, command, timeout}` entries without the required nested `hooks: []` array, timeouts in milliseconds instead of seconds, and a `PreCommit` event that isn't a real Claude Code event. PR #208 (shipped in v2.2.3) rewrote the generator to emit the correct v1.x+ schema.
 
 **Fix:**
 
 ```bash
-pip install --upgrade code-review-graph   # → v2.2.4 or later
+pip install --upgrade code-review-graph   # v2.2.4 or later
 cd /path/to/your/project
 code-review-graph install                 # rewrites .claude/settings.json
 ```
@@ -24,7 +24,7 @@ Valid Claude Code hook events are: `PreToolUse`, `PostToolUse`, `UserPromptSubmi
 
 `pip install` put the console script into a `bin/` directory that isn't on your `$PATH`. Four fixes, in order of recommendation:
 
-**Option 1 — Use `pipx` (cleanest):**
+**Option 1 - Use `pipx` (cleanest):**
 
 ```bash
 pip uninstall code-review-graph
@@ -33,21 +33,21 @@ pipx install code-review-graph
 
 `pipx` installs CLI tools in an isolated venv and guarantees `~/.local/bin` is on PATH.
 
-**Option 2 — Use `uvx` (no install needed):**
+**Option 2 - Use `uvx` (no install needed):**
 
 ```bash
 uvx code-review-graph install
 uvx code-review-graph build
 ```
 
-**Option 3 — Run it as a Python module (always works):**
+**Option 3 - Run it as a Python module (always works):**
 
 ```bash
 python -m code_review_graph install
 python -m code_review_graph build
 ```
 
-**Option 4 — Fix PATH manually:**
+**Option 4 - Fix PATH manually:**
 
 ```bash
 pip show code-review-graph | grep Location
@@ -59,7 +59,7 @@ source ~/.zshrc
 
 ### 3. Is code-review-graph project-scoped or user-scoped?
 
-**Both** — four different pieces, each scoped differently:
+**Both** - four different pieces, each scoped differently:
 
 | Piece                         | Scope          | Where                                                            |
 |-------------------------------|----------------|------------------------------------------------------------------|
@@ -74,10 +74,10 @@ source ~/.zshrc
 
 Claude Code hooks and MCP tool paths in `.claude/settings.json` are **hardcoded at install time**. If you switch to (or create) a virtual environment after running `code-review-graph install`, the paths will still point to the old interpreter and the server will silently fail or use the wrong Python.
 
-**Fix — update the `command`/`args` in `.mcp.json` and any hook commands in `.claude/settings.json` to match your venv:**
+**Fix - update the `command`/`args` in `.mcp.json` and any hook commands in `.claude/settings.json` to match your venv:**
 
 ```json
-// .mcp.json — point to your venv's Python or uvx inside the venv
+// .mcp.json - point to your venv's Python or uvx inside the venv
 {
   "mcpServers": {
     "code-review-graph": {
@@ -101,7 +101,7 @@ Then fully quit and reopen Claude Code so it picks up the new config.
 
 Most likely causes, ranked:
 
-1. **You didn't restart Claude Code after `install`.** Claude Code reads `.mcp.json` at startup — if you ran `install` in one session, fully quit and reopen Claude Code for the MCP server to register.
+1. **You didn't restart Claude Code after `install`.** Claude Code reads `.mcp.json` at startup. If you ran `install` in one session, fully quit and reopen Claude Code for the MCP server to register.
 2. **New session's `cwd` is a different directory.** The MCP server is launched with `cwd=<project>` and it reads `.code-review-graph/graph.db` from there. If your new session opened in a parent folder or a different project, it won't find the graph you built.
 3. **You ran `build` but not `install`.** `build` creates `graph.db`; `install` is what registers the MCP server with Claude Code via `.mcp.json`. You need both.
 4. **MCP server is crashing on startup.** Run `/mcp` inside Claude Code to see server status, or check `~/Library/Logs/Claude/mcp*.log` on macOS.
@@ -116,7 +116,7 @@ cat .mcp.json               # should reference `code-review-graph serve`
 # then: fully quit Claude Code and reopen it inside this project
 ```
 
-If `status` shows the graph but `/mcp` in the new session doesn't list `code-review-graph`, the `.mcp.json` isn't in the session's `cwd` — re-run `code-review-graph install` from the correct project root.
+If `status` shows the graph but `/mcp` in the new session doesn't list `code-review-graph`, the `.mcp.json` isn't in the session's `cwd`. Re-run `code-review-graph install` from the correct project root.
 
 ---
 
@@ -135,6 +135,16 @@ The graph uses SQLite with WAL mode. If you see lock errors:
   vendor/**
   *.min.js
   ```
+
+## Large MCP payloads or token pressure
+- Start with `get_minimal_context_tool` before broad graph exploration
+- Prefer `detail_level="minimal"` on tools that support it
+- Use `get_architecture_overview_tool(detail_level="minimal")` for bounded community orientation
+- Use `list_communities_tool(detail_level="minimal")` before selecting one community
+- Use default `get_community_tool()` for bounded metadata and a small member-name sample
+- Use `get_community_tool(include_member_names=true)` only when full member names are needed
+- Use `get_community_tool(include_members=true)` only for one focused community that needs full node details
+- Avoid pasting full MCP payloads into issues, handoffs, or public reports
 
 ## Missing nodes after build
 - Check that the file's language is supported (see [FEATURES.md](FEATURES.md))

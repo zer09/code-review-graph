@@ -643,7 +643,13 @@ class TestCommunityTools:
         result = get_community_func(community_id=cid, repo_root=str(self.root))
         assert result["status"] == "ok"
         assert "community" in result
-        assert result["community"]["id"] == cid
+        community = result["community"]
+        assert community["id"] == cid
+        assert "members" not in community
+        assert "member_details" not in community
+        assert "member_count" in community
+        assert "members_sample" in community
+        assert len(community["members_sample"]) <= 20
 
     def test_get_community_by_name(self):
         # Get a community name from list
@@ -667,6 +673,34 @@ class TestCommunityTools:
         )
         assert result["status"] == "not_found"
 
+    def test_get_community_members_sample_limit(self):
+        comms_result = list_communities_func(repo_root=str(self.root))
+        assert len(comms_result["communities"]) >= 1
+        cid = comms_result["communities"][0]["id"]
+
+        result = get_community_func(
+            community_id=cid, members_sample_limit=1, repo_root=str(self.root)
+        )
+        assert result["status"] == "ok"
+        community = result["community"]
+        assert len(community["members_sample"]) <= 1
+        assert community["members_truncated"] is (community["member_count"] > 1)
+
+    def test_get_community_include_member_names(self):
+        comms_result = list_communities_func(repo_root=str(self.root))
+        assert len(comms_result["communities"]) >= 1
+        cid = comms_result["communities"][0]["id"]
+
+        result = get_community_func(
+            community_id=cid, include_member_names=True, repo_root=str(self.root)
+        )
+        assert result["status"] == "ok"
+        community = result["community"]
+        assert "members" in community
+        assert "members_sample" not in community
+        assert community["member_count"] == len(community["members"])
+        assert community["members_truncated"] is False
+
     def test_get_community_include_members(self):
         comms_result = list_communities_func(repo_root=str(self.root))
         assert len(comms_result["communities"]) >= 1
@@ -678,6 +712,7 @@ class TestCommunityTools:
         assert result["status"] == "ok"
         assert "member_details" in result["community"]
         assert len(result["community"]["member_details"]) >= 1
+        assert "members" not in result["community"]
 
     def test_get_community_summary_format(self):
         comms_result = list_communities_func(repo_root=str(self.root))
@@ -694,8 +729,27 @@ class TestCommunityTools:
         result = get_architecture_overview_func(repo_root=str(self.root))
         assert "communities" in result
         assert "cross_community_edges" in result
+        assert "cross_community_edge_examples_included" in result
+        assert result["cross_community_edge_examples_included"] is True
+        assert "total_cross_community_edges" in result
+        assert "cross_community_edges_truncated" in result
         assert "warnings" in result
         assert "summary" in result
+        if result["communities"]:
+            assert "member_count" in result["communities"][0]
+            assert "members" not in result["communities"][0]
+
+    def test_get_architecture_overview_minimal_omits_edge_examples(self):
+        result = get_architecture_overview_func(
+            repo_root=str(self.root), detail_level="minimal"
+        )
+        assert result["status"] == "ok"
+        assert result["cross_community_edge_examples_included"] is False
+        assert result["cross_community_edges"] == []
+        assert "total_cross_community_edges" in result
+        assert "cross_community_coupling" in result
+        if result["total_cross_community_edges"] > 0:
+            assert result["cross_community_edges_truncated"] is True
 
     def test_get_architecture_overview_summary_format(self):
         result = get_architecture_overview_func(repo_root=str(self.root))

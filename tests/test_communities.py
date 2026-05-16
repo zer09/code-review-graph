@@ -164,6 +164,48 @@ class TestCommunities:
         assert isinstance(overview["communities"], list)
         assert isinstance(overview["cross_community_edges"], list)
         assert isinstance(overview["warnings"], list)
+        assert "total_cross_community_edges" in overview
+        assert "cross_community_edge_examples_included" in overview
+        assert overview["cross_community_edge_examples_included"] is True
+        assert "cross_community_edges_truncated" in overview
+        assert overview["cross_community_edges_truncated"] is (
+            len(overview["cross_community_edges"])
+            < overview["total_cross_community_edges"]
+        )
+        if overview["communities"]:
+            first = overview["communities"][0]
+            assert "member_count" in first
+            assert "members" not in first
+
+    def test_architecture_overview_minimal_omits_edge_examples(self):
+        """Minimal architecture overview keeps totals but omits edge examples."""
+        self._seed_two_clusters()
+        communities = detect_communities(self.store, min_size=2)
+        store_communities(self.store, communities)
+
+        overview = get_architecture_overview(self.store, detail_level="minimal")
+        assert overview["cross_community_edge_examples_included"] is False
+        assert overview["cross_community_edges"] == []
+        assert "total_cross_community_edges" in overview
+        assert "cross_community_coupling" in overview
+        assert "warnings" in overview
+        if overview["total_cross_community_edges"] > 0:
+            assert overview["cross_community_edges_truncated"] is True
+        else:
+            assert overview["cross_community_edges_truncated"] is False
+
+    def test_architecture_overview_invalid_detail_level_defaults_to_standard(self):
+        """Unknown detail levels preserve standard behavior for compatibility."""
+        self._seed_two_clusters()
+        communities = detect_communities(self.store, min_size=2)
+        store_communities(self.store, communities)
+
+        overview = get_architecture_overview(self.store, detail_level="unknown")
+        assert overview["cross_community_edge_examples_included"] is True
+        assert overview["cross_community_edges_truncated"] is (
+            len(overview["cross_community_edges"])
+            < overview["total_cross_community_edges"]
+        )
 
     def test_architecture_overview_excludes_tested_by_coupling(self):
         """TESTED_BY edges do not count toward coupling warnings."""
@@ -174,8 +216,8 @@ class TestCommunities:
         # Add many TESTED_BY cross-community edges (well above the threshold of 10)
         for i in range(20):
             self.store.upsert_edge(EdgeInfo(
-                kind="TESTED_BY", source=f"auth.py::login",
-                target=f"db.py::query", file_path="auth.py", line=i + 100,
+                kind="TESTED_BY", source="auth.py::login",
+                target="db.py::query", file_path="auth.py", line=i + 100,
             ))
         self.store.commit()
 

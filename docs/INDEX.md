@@ -1,11 +1,20 @@
 # Documentation Index
 
-- [USAGE.md](USAGE.md) -- How to install and use
-- [FEATURES.md](FEATURES.md) -- What's included, changelog
-- [COMMANDS.md](COMMANDS.md) -- All 22 MCP tools, 5 MCP prompts, skills, and CLI commands
-- [LLM-OPTIMIZED-REFERENCE.md](LLM-OPTIMIZED-REFERENCE.md) -- Token-optimized reference (Claude Code reads this)
-- [architecture.md](architecture.md) -- System design and data flow
-- [schema.md](schema.md) -- Graph node/edge schema, SQLite tables (including flows, communities, FTS5)
-- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) -- Common issues and fixes (including Windows/WSL)
-- [ROADMAP.md](ROADMAP.md) -- Shipped and planned features
-- [LEGAL.md](LEGAL.md) -- License and privacy
+Start here, then open the task-specific document you need.
+
+## Task guides
+
+- Install and daily usage: [USAGE.md](USAGE.md)
+- MCP tools, prompts, skills, and CLI commands: [COMMANDS.md](COMMANDS.md)
+- Architecture overview tool and token-safety behavior: [ARCHITECTURE-OVERVIEW.md](ARCHITECTURE-OVERVIEW.md)
+- Fork differences from upstream and merge guidance: [FORK-DIFFERENCES.md](FORK-DIFFERENCES.md)
+- Troubleshooting install, MCP, daemon, and graph issues: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+
+## Reference
+
+- Feature list and changelog: [FEATURES.md](FEATURES.md)
+- Token-optimized agent reference: [LLM-OPTIMIZED-REFERENCE.md](LLM-OPTIMIZED-REFERENCE.md)
+- System design and data flow: [architecture.md](architecture.md)
+- Graph node, edge, and SQLite schema: [schema.md](schema.md)
+- Roadmap: [ROADMAP.md](ROADMAP.md)
+- Legal and privacy notes: [LEGAL.md](LEGAL.md)

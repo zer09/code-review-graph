@@ -1,6 +1,6 @@
-# Code Review Graph — User Guide
+# Code Review Graph - User Guide
 
-**Version:** v2.1.0 (Apr 3, 2026)
+**Version:** v2.3.3
 
 ## Installation
 
@@ -67,7 +67,7 @@ Auto-updates the graph on every file save. Zero manual work.
 code-review-graph visualize
 open .code-review-graph/graph.html
 ```
-Interactive D3.js force-directed graph. Starts collapsed (File nodes only) — click a file to expand its children. Use the search bar to filter, and click legend edge types to toggle visibility.
+Interactive D3.js force-directed graph. Starts collapsed with File nodes only. Click a file to expand its children. Use the search bar to filter, and click legend edge types to toggle visibility.
 
 ### 6. Semantic search (optional)
 ```bash

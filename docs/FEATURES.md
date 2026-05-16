@@ -64,7 +64,7 @@
 - **README rewrite**: Professional documentation with real benchmark data from httpx, FastAPI, and Next.js.
 
 ## v1.6.4
-- **Portable MCP config**: `init` now generates `uvx`-based `.mcp.json` — no absolute paths, works on any machine with `uv` installed
+- **Portable MCP config**: `init` now generates `uvx`-based `.mcp.json` - no absolute paths, works on any machine with `uv` installed
 - **Removed symlink workaround**: The `_safe_path` helper for spaces-in-paths is no longer needed with `uvx`
 
 ## v1.6.3
@@ -97,7 +97,7 @@
 
 ## v1.3.0
 - **Python version check with Docker fallback**: Automatically detects Python 3.10+ and suggests Docker if unavailable
-- **Universal install**: `pip install code-review-graph` — no git clone needed
+- **Universal install**: `pip install code-review-graph` - no git clone needed
 - **CLI entry point**: `code-review-graph` command available system-wide after pip install
 
 ## v1.2.0
@@ -107,17 +107,17 @@
 - **CI coverage**: GitHub Actions CI/CD pipeline with test coverage reporting
 
 ## v1.1.0
-- **Watch mode**: `code-review-graph watch` — auto-rebuilds graph on file changes
+- **Watch mode**: `code-review-graph watch` - auto-rebuilds graph on file changes
 - **Vector embeddings**: Optional `pip install .[embeddings]` for semantic code search
 - **Go, Rust, Java verified**: 12+ languages with dedicated test coverage
 - **47 tests passing**, 8 MCP tools registered
 - README badges and cleaner install flow
 
 ## v1.0.0 (Foundation)
-- **Persistent SQLite knowledge graph** — zero external dependencies
-- **Tree-sitter multi-language parsing** — classes, functions, imports, calls, inheritance
+- **Persistent SQLite knowledge graph** - zero external dependencies
+- **Tree-sitter multi-language parsing** - classes, functions, imports, calls, inheritance
 - **Incremental updates** via `git diff` + automatic dependency cascade
-- **Impact-radius / blast-radius analysis** — BFS through call/import/inheritance graph
+- **Impact-radius / blast-radius analysis** - BFS through call/import/inheritance graph
 - **6 MCP tools** for full graph interaction
 - **3 review-first skills**: build-graph, review-delta, review-pr
 - **PostToolUse hooks** (Write|Edit|Bash) for automatic background updates

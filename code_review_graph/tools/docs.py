@@ -59,7 +59,7 @@ def embed_graph(
             else:
                 err = (
                     "The local embedding provider needs sentence-transformers. "
-                    "Install with: pip install code-review-graph[embeddings] — "
+                    "Install with: pip install code-review-graph[embeddings] - "
                     "or switch provider to 'openai' / 'google' / 'minimax'."
                 )
             return {"status": "error", "error": err}
@@ -97,7 +97,8 @@ def get_docs_section(
 
     Args:
         section_name: Exact section name. One of: usage, review-delta,
-                      review-pr, commands, legal, watch, embeddings,
+                      review-pr, commands, architecture-overview,
+                      fork-differences, legal, watch, embeddings,
                       languages, troubleshooting.
         repo_root: Repository root path. Auto-detected from current
                    directory if omitted.
@@ -147,7 +148,8 @@ def get_docs_section(
 
     available = [
         "usage", "review-delta", "review-pr", "commands",
-        "legal", "watch", "embeddings", "languages", "troubleshooting",
+        "architecture-overview", "fork-differences", "legal", "watch",
+        "embeddings", "languages", "troubleshooting",
     ]
     return {
         "status": "not_found",

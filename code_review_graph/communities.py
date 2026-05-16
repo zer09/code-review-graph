@@ -18,6 +18,12 @@ logger = logging.getLogger(__name__)
 # Stay well under SQLite's default 999-variable limit per statement.
 _SQL_BATCH = 450
 
+# Keep architecture-overview MCP responses bounded. MCP clients commonly store
+# both text and structured tool payloads, so every returned byte can be counted
+# multiple times in the agent session.
+_ARCHITECTURE_OVERVIEW_EDGE_LIMIT = 100
+_ARCHITECTURE_OVERVIEW_COUPLING_LIMIT = 50
+
 # ---------------------------------------------------------------------------
 # Optional igraph import
 # ---------------------------------------------------------------------------
@@ -786,34 +792,62 @@ def _is_test_community(name: str) -> bool:
     return bool(_TEST_COMMUNITY_RE.search(name))
 
 
-def get_architecture_overview(store: GraphStore) -> dict[str, Any]:
+def _community_overview_summary(comm: dict[str, Any]) -> dict[str, Any]:
+    """Return bounded community metadata for architecture overviews."""
+    members = comm.get("members", [])
+    return {
+        "id": comm.get("id"),
+        "name": comm.get("name", ""),
+        "level": comm.get("level"),
+        "cohesion": comm.get("cohesion"),
+        "size": comm.get("size"),
+        "member_count": len(members),
+        "dominant_language": comm.get("dominant_language", ""),
+        "description": comm.get("description", ""),
+    }
+
+
+def get_architecture_overview(
+    store: GraphStore,
+    detail_level: str = "standard",
+) -> dict[str, Any]:
     """Generate an architecture overview based on community structure.
 
     Builds a node-to-community mapping, counts cross-community edges,
-    and generates warnings for high coupling.
+    and generates warnings for high coupling. The returned payload is bounded:
+    community member lists are summarized, and cross-community edge examples
+    are omitted in minimal mode.
 
     Args:
         store: The GraphStore instance.
+        detail_level: "standard" includes bounded edge examples;
+            "minimal" omits edge examples while keeping totals and coupling.
 
     Returns:
         Dict with keys: communities, cross_community_edges, warnings.
     """
+    detail_level = detail_level if detail_level in {"minimal", "standard"} else "standard"
+    include_edge_examples = detail_level != "minimal"
     communities = get_communities(store)
 
-    # Build node -> community_id mapping
+    # Build node -> community_id mapping from full member lists, but do not
+    # return those lists in the overview payload.
     node_to_community: dict[str, int] = {}
     for comm in communities:
         comm_id = comm.get("id", 0)
         for qn in comm.get("members", []):
             node_to_community[qn] = comm_id
 
-    # Count cross-community edges
+    # Count cross-community edges while keeping only bounded examples.
     all_edges = store.get_all_edges()
     cross_edges: list[dict[str, Any]] = []
     cross_counts: Counter[tuple[int, int]] = Counter()
+    cross_kind_counts: defaultdict[tuple[int, int], Counter[str]] = defaultdict(
+        Counter
+    )
 
     for e in all_edges:
-        # TESTED_BY edges are expected cross-community coupling (test → code),
+        # TESTED_BY edges are expected cross-community coupling (test -> code),
         # not an architectural smell.
         if e.kind == "TESTED_BY":
             continue
@@ -826,13 +860,18 @@ def get_architecture_overview(store: GraphStore) -> dict[str, Any]:
         ):
             pair = (min(src_comm, tgt_comm), max(src_comm, tgt_comm))
             cross_counts[pair] += 1
-            cross_edges.append({
-                "source_community": src_comm,
-                "target_community": tgt_comm,
-                "edge_kind": e.kind,
-                "source": _sanitize_name(e.source_qualified),
-                "target": _sanitize_name(e.target_qualified),
-            })
+            cross_kind_counts[pair][e.kind] += 1
+            if (
+                include_edge_examples
+                and len(cross_edges) < _ARCHITECTURE_OVERVIEW_EDGE_LIMIT
+            ):
+                cross_edges.append({
+                    "source_community": src_comm,
+                    "target_community": tgt_comm,
+                    "edge_kind": e.kind,
+                    "source": _sanitize_name(e.source_qualified),
+                    "target": _sanitize_name(e.target_qualified),
+                })
 
     # Generate warnings for high coupling, skipping test-dominated pairs.
     warnings: list[str] = []
@@ -841,7 +880,7 @@ def get_architecture_overview(store: GraphStore) -> dict[str, Any]:
         if count > 10:
             name1 = comm_name_map.get(c1, f"community-{c1}")
             name2 = comm_name_map.get(c2, f"community-{c2}")
-            # Skip pairs where either community is test-dominated — coupling
+            # Skip pairs where either community is test-dominated. Coupling
             # between test and production code is expected, not architectural.
             if _is_test_community(name1) or _is_test_community(name2):
                 continue
@@ -850,8 +889,36 @@ def get_architecture_overview(store: GraphStore) -> dict[str, Any]:
                 f"'{name1}' and '{name2}'"
             )
 
+    cross_coupling = []
+    for (c1, c2), count in cross_counts.most_common(
+        _ARCHITECTURE_OVERVIEW_COUPLING_LIMIT
+    ):
+        cross_coupling.append({
+            "source_community": c1,
+            "source_community_name": comm_name_map.get(c1, f"community-{c1}"),
+            "target_community": c2,
+            "target_community_name": comm_name_map.get(c2, f"community-{c2}"),
+            "edge_count": count,
+            "edge_kinds": dict(cross_kind_counts[(c1, c2)].most_common()),
+        })
+
+    total_cross_edges = sum(cross_counts.values())
+    total_coupling_pairs = len(cross_counts)
+
     return {
-        "communities": communities,
+        "communities": [
+            _community_overview_summary(c) for c in communities
+        ],
         "cross_community_edges": cross_edges,
+        "cross_community_edge_examples_included": include_edge_examples,
+        "total_cross_community_edges": total_cross_edges,
+        "cross_community_edges_truncated": (
+            len(cross_edges) < total_cross_edges
+        ),
+        "cross_community_coupling": cross_coupling,
+        "total_cross_community_coupling_pairs": total_coupling_pairs,
+        "cross_community_coupling_truncated": (
+            len(cross_coupling) < total_coupling_pairs
+        ),
         "warnings": warnings,
     }

@@ -377,8 +377,9 @@ def get_docs_section_tool(
     Returns only the requested section content for minimal token usage.
     Use this before answering any user question about the plugin.
 
-    Available sections: usage, review-delta, review-pr, commands, legal,
-    watch, embeddings, languages, troubleshooting.
+    Available sections: usage, review-delta, review-pr, commands,
+    architecture-overview, legal, watch, embeddings, languages,
+    troubleshooting.
 
     Args:
         section_name: The section to retrieve (e.g. "review-delta", "usage").
@@ -524,12 +525,16 @@ def get_community_tool(
     community_name: Optional[str] = None,
     community_id: Optional[int] = None,
     include_members: bool = False,
+    include_member_names: bool = False,
+    members_sample_limit: int = 20,
     repo_root: Optional[str] = None,
 ) -> dict:
     """Get detailed information about a single code community.
 
-    Returns community metadata including size, cohesion, dominant language,
-    and member list. Optionally includes full node details for each member.
+    Returns bounded community metadata by default, including size, cohesion,
+    dominant language, member_count, and a small members_sample. Full member
+    names and full member node details are explicit opt-ins because they can be
+    large on big repositories.
 
     Provide either community_id (from list_communities_tool) or community_name
     to search by name.
@@ -538,17 +543,22 @@ def get_community_tool(
         community_name: Name to search for (partial match). Ignored if community_id given.
         community_id: Database ID of the community.
         include_members: Include full member node details. Default: False.
+        include_member_names: Include the full member qualified-name list. Default: False.
+        members_sample_limit: Max member names to include in the default sample. Default: 20.
         repo_root: Repository root path. Auto-detected if omitted.
     """
     return get_community_func(
         community_name=community_name, community_id=community_id,
         include_members=include_members, repo_root=_resolve_repo_root(repo_root),
+        include_member_names=include_member_names,
+        members_sample_limit=members_sample_limit,
     )
 
 
 @mcp.tool()
 def get_architecture_overview_tool(
     repo_root: Optional[str] = None,
+    detail_level: str = "standard",
 ) -> dict:
     """Generate an architecture overview based on community structure.
 
@@ -558,8 +568,12 @@ def get_architecture_overview_tool(
 
     Args:
         repo_root: Repository root path. Auto-detected if omitted.
+        detail_level: "standard" includes bounded edge examples;
+            "minimal" omits edge examples while keeping totals and coupling.
     """
-    return get_architecture_overview_func(repo_root=_resolve_repo_root(repo_root))
+    return get_architecture_overview_func(
+        repo_root=_resolve_repo_root(repo_root), detail_level=detail_level
+    )
 
 
 @mcp.tool()

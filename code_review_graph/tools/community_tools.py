@@ -68,16 +68,59 @@ def list_communities_func(
 # ---------------------------------------------------------------------------
 
 
+def _safe_members_sample_limit(members_sample_limit: int) -> int:
+    """Clamp member samples so default community details stay bounded."""
+    try:
+        limit = int(members_sample_limit)
+    except (TypeError, ValueError):
+        limit = 20
+    return max(0, min(limit, 100))
+
+
+def _community_detail_summary(
+    community: dict[str, Any],
+    *,
+    include_member_names: bool = False,
+    members_sample_limit: int = 20,
+) -> dict[str, Any]:
+    """Return bounded metadata for a single community detail response."""
+    members = list(community.get("members") or [])
+    limit = _safe_members_sample_limit(members_sample_limit)
+    result: dict[str, Any] = {
+        "id": community.get("id"),
+        "name": community.get("name", ""),
+        "level": community.get("level"),
+        "cohesion": community.get("cohesion"),
+        "size": community.get("size"),
+        "member_count": len(members),
+        "dominant_language": community.get("dominant_language", ""),
+        "description": community.get("description", ""),
+    }
+
+    if include_member_names:
+        result["members"] = members
+        result["members_truncated"] = False
+    else:
+        result["members_sample"] = members[:limit]
+        result["members_truncated"] = len(members) > limit
+
+    return result
+
+
 def get_community_func(
     community_name: str | None = None,
     community_id: int | None = None,
     include_members: bool = False,
     repo_root: str | None = None,
+    include_member_names: bool = False,
+    members_sample_limit: int = 20,
 ) -> dict[str, Any]:
     """Get details of a single code community.
 
     [EXPLORE] Retrieves a community by its database ID or by name match.
-    Optionally includes the full list of member nodes.
+    The default response returns bounded metadata and a small member-name
+    sample. Full member names and full member node details are explicit
+    opt-ins because they can produce large MCP payloads.
 
     Args:
         community_name: Name to search for (partial match). Ignored if
@@ -85,13 +128,15 @@ def get_community_func(
         community_id: Database ID of the community.
         include_members: If True, include full member node details.
         repo_root: Repository root path. Auto-detected if omitted.
+        include_member_names: If True, include the full member name list.
+        members_sample_limit: Max member names to include by default.
 
     Returns:
         Community details, or not_found status.
     """
     store, root = _get_store(repo_root)
     try:
-        community: dict | None = None
+        community: dict[str, Any] | None = None
         all_communities = get_communities(store)
 
         if community_id is not None:
@@ -113,21 +158,26 @@ def get_community_func(
                 ),
             }
 
+        community_detail = _community_detail_summary(
+            community,
+            include_member_names=include_member_names,
+            members_sample_limit=members_sample_limit,
+        )
         if include_members:
             cid = community.get("id")
             if cid is not None:
                 member_nodes = store.get_nodes_by_community_id(cid)
                 members = [node_to_dict(n) for n in member_nodes]
-                community["member_details"] = members
+                community_detail["member_details"] = members
 
         result = {
             "status": "ok",
             "summary": (
-                f"Community '{community['name']}': "
-                f"{community['size']} nodes, "
-                f"cohesion {community['cohesion']:.4f}"
+                f"Community '{community_detail['name']}': "
+                f"{community_detail['size']} nodes, "
+                f"cohesion {community_detail['cohesion']:.4f}"
             ),
-            "community": community,
+            "community": community_detail,
         }
         result["_hints"] = generate_hints(
             "get_community", result, get_session()
@@ -146,6 +196,7 @@ def get_community_func(
 
 def get_architecture_overview_func(
     repo_root: str | None = None,
+    detail_level: str = "standard",
 ) -> dict[str, Any]:
     """Generate an architecture overview based on community structure.
 
@@ -155,6 +206,8 @@ def get_architecture_overview_func(
 
     Args:
         repo_root: Repository root path. Auto-detected if omitted.
+        detail_level: "standard" includes bounded edge examples;
+            "minimal" omits edge examples while keeping totals and coupling.
 
     Returns:
         Architecture overview with communities, cross-community edges,
@@ -162,9 +215,12 @@ def get_architecture_overview_func(
     """
     store, root = _get_store(repo_root)
     try:
-        overview = get_architecture_overview(store)
+        overview = get_architecture_overview(store, detail_level=detail_level)
         n_communities = len(overview["communities"])
-        n_cross = len(overview["cross_community_edges"])
+        n_cross = overview.get(
+            "total_cross_community_edges",
+            len(overview["cross_community_edges"]),
+        )
         n_warnings = len(overview["warnings"])
         result = {
             "status": "ok",
