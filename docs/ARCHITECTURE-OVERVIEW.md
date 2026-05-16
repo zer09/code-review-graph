@@ -27,48 +27,57 @@ Do not use it when the task needs detailed source context. Prefer focused tools:
 
 ## Output contract
 
-The MCP tool returns a bounded structure:
+The MCP tool wrapper returns a bounded structure:
 
-- `status` - tool status.
-- `summary` - human-readable count of communities, cross-community edges, and warnings.
-- `communities` - bounded community metadata.
-- `cross_community_edges` - capped examples of cross-community edges, or an empty list in minimal mode.
+- `status` - tool status (`ok` or `error`).
+- `summary` - human-readable count of communities, non-`TESTED_BY` cross-community edges, and warnings.
+- `communities` - bounded community metadata. Each item includes `id`, `name`, `level`, `cohesion`, `size`, `member_count`, `dominant_language`, and `description`; it intentionally omits `members`.
+- `cross_community_edges` - capped examples of non-`TESTED_BY` cross-community edges in standard mode, or an empty list in minimal mode. `source` and `target` are sanitized and truncated graph qualified names.
 - `cross_community_edge_examples_included` - whether edge examples were included.
-- `total_cross_community_edges` - full count of cross-community edges.
+- `total_cross_community_edges` - full count of non-`TESTED_BY` cross-community edges.
 - `cross_community_edges_truncated` - whether edge examples were capped or intentionally omitted.
-- `cross_community_coupling` - top coupling pairs with edge counts and edge kinds.
+- `cross_community_coupling` - top non-`TESTED_BY` community pairs with edge counts and edge-kind breakdowns. The pair IDs are sorted to de-duplicate opposite directions; they are not directional source and target IDs.
 - `total_cross_community_coupling_pairs` - full count of coupling pairs.
 - `cross_community_coupling_truncated` - whether coupling pairs were capped.
-- `warnings` - high-coupling warnings, excluding test-dominated coupling.
+- `warnings` - high-coupling warnings for pairs above the threshold. `TESTED_BY` edges are ignored, and warnings are filtered with a name-based test-community heuristic. Coupling summaries still include non-`TESTED_BY` pairs involving test-like communities, and generated test names not matched by the heuristic may still warn.
+- `_hints` - follow-up tool suggestions and warning hints added by the MCP tool wrapper.
 
-Each returned community includes `member_count` instead of a full `members` list. Full member lists are available through focused community drill-downs.
+The lower-level `get_architecture_overview` helper returns the overview keys without wrapper fields such as `status`, `summary`, and `_hints`. Full member lists are available through focused community drill-downs.
 
 ## Detail levels
 
-Use `detail_level="minimal"` for first-pass orientation. Minimal mode keeps communities, total counts, coupling summaries, and warnings, but omits verbose `cross_community_edges` examples.
+Use `detail_level="minimal"` for first-pass orientation. Minimal mode keeps communities, total counts, truncation flags, coupling summaries, warnings, status, summary, and hints, but sets `cross_community_edges` to an empty list and `cross_community_edge_examples_included` to `false`.
 
-Use `detail_level="standard"` when you need example source/target edges for follow-up graph exploration. Standard mode is the default and preserves backward-compatible behavior.
+Use `detail_level="standard"` when you need example source/target edges for follow-up graph exploration. Standard mode is the default and includes up to 100 edge examples.
+
+Unknown detail levels default to standard mode.
 
 ## Compact example
 
 ```json
 {
   "status": "ok",
-  "summary": "Architecture: 16 communities, 1157 cross-community edges, 2 warning(s)",
+  "summary": "Architecture: 2 communities, 128 cross-community edges, 1 warning(s)",
   "communities": [
     {
       "id": 1,
       "name": "tools",
-      "member_count": 42,
+      "level": 0,
       "cohesion": 0.71,
-      "dominant_language": "python"
+      "size": 42,
+      "member_count": 42,
+      "dominant_language": "python",
+      "description": "Directory-based community: tools"
     },
     {
       "id": 2,
       "name": "graph",
-      "member_count": 57,
+      "level": 0,
       "cohesion": 0.68,
-      "dominant_language": "python"
+      "size": 57,
+      "member_count": 57,
+      "dominant_language": "python",
+      "description": "Directory-based community: graph"
     }
   ],
   "cross_community_edges": [
@@ -81,7 +90,7 @@ Use `detail_level="standard"` when you need example source/target edges for foll
     }
   ],
   "cross_community_edge_examples_included": true,
-  "total_cross_community_edges": 1157,
+  "total_cross_community_edges": 128,
   "cross_community_edges_truncated": true,
   "cross_community_coupling": [
     {
@@ -89,17 +98,30 @@ Use `detail_level="standard"` when you need example source/target edges for foll
       "source_community_name": "tools",
       "target_community": 2,
       "target_community_name": "graph",
-      "edge_count": 231,
-      "edge_kinds": {"CALLS": 211, "REFERENCES": 20}
+      "edge_count": 128,
+      "edge_kinds": {"CALLS": 108, "REFERENCES": 20}
     }
   ],
-  "total_cross_community_coupling_pairs": 3,
+  "total_cross_community_coupling_pairs": 1,
   "cross_community_coupling_truncated": false,
-  "warnings": []
+  "warnings": [
+    "High coupling (128 edges) between 'tools' and 'graph'"
+  ],
+  "_hints": {
+    "next_steps": [
+      {"tool": "list_communities", "suggestion": "Drill into individual communities"},
+      {"tool": "detect_changes", "suggestion": "See how recent changes affect the architecture"},
+      {"tool": "list_flows", "suggestion": "Explore execution flows"}
+    ],
+    "related": [],
+    "warnings": [
+      "High coupling (128 edges) between 'tools' and 'graph'"
+    ]
+  }
 }
 ```
 
-In this example, `source_community: 1` points to the community object with `id: 1` and `name: "tools"`. `target_community: 2` points to the community object with `id: 2` and `name: "graph"`. These IDs are community identifiers from the graph, not ranks or priorities, and they can vary between repositories or graph rebuilds.
+In this example, `source_community: 1` in an edge example points to the community object with `id: 1` and `name: "tools"`; `target_community: 2` points to the community object with `id: 2` and `name: "graph"`. In `cross_community_coupling`, the pair IDs are sorted for aggregation and should be read as a community pair, not as call direction. These IDs are community identifiers from the graph, not ranks or priorities, and they can vary between repositories or graph rebuilds.
 
 ## Why the output must stay bounded
 
@@ -120,8 +142,10 @@ The overview uses bounded output by design:
 
 - Full community member lists are used internally for calculations but are not returned.
 - Each returned community has `member_count` instead of `members`.
-- Cross-community edge examples are capped.
-- Total counts and truncation flags preserve accuracy.
+- Standard mode caps cross-community edge examples at 100.
+- Coupling pair summaries are capped at 50.
+- `TESTED_BY` edges are excluded from cross-community edge counts, examples, coupling summaries, and warnings.
+- Total counts and truncation flags preserve accuracy for non-`TESTED_BY` cross-community edges.
 - Coupling pairs are summarized with counts and edge-kind breakdowns.
 
 Measured on a large repository:
